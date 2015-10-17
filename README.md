@@ -19,7 +19,8 @@ HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download speed
 # DESCRIPTION
 
 HTTP::Tiny::Bandwidth is a HTTP::Tiny subclass which can limits download speed.
-If you want to use LWP with limitation of download speed,
+
+If you want to use LWP::UserAgent with limitation of download speed,
 see [eg](https://github.com/shoichikaji/HTTP-Tiny-Bandwidth/tree/master/eg) directory.
 
 HTTP::Tiny::Bandwidth->mirror accepts `{ limit_bps => LIMIT_BIT_PER_SEC }` argument.
@@ -28,12 +29,12 @@ HTTP::Tiny::Bandwidth->mirror accepts `{ limit_bps => LIMIT_BIT_PER_SEC }` argum
 If you want to get content as perl variable, try this:
 
     my $content;
-    open my $content_fh, ">+", \$content;
+    open my $content_fh, "+>", \$content;
 
     my $limit_bps = 5 * (1024**2); # 5Mbps
     my $http = HTTP::Tiny::Bandwidth->new;
     my $res = $http->get(
-      "http://example.com/data.bin",
+      "http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz",
       { data_callback => $http->limit_data_callback($content_fh, $limit_bps) },
     );
     close $content_fh;
