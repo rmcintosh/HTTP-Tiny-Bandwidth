@@ -7,7 +7,7 @@ use 5.008005;
 use ExtUtils::MakeMaker;
 
 my %WriteMakefileArgs = (
-  "ABSTRACT" => "HTTP::Tiny with bandwidth management",
+  "ABSTRACT" => "HTTP::Tiny with limitation of download speed",
   "AUTHOR" => "Shoichi Kaji",
   "CONFIGURE_REQUIRES" => {
     "ExtUtils::MakeMaker" => 0

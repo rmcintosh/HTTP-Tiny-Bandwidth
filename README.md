@@ -2,7 +2,7 @@
 
 # NAME
 
-HTTP::Tiny::Bandwidth - HTTP::Tiny with bandwidth management
+HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download speed
 
 # SYNOPSIS
 
@@ -18,7 +18,9 @@ HTTP::Tiny::Bandwidth - HTTP::Tiny with bandwidth management
 
 # DESCRIPTION
 
-HTTP::Tiny::Bandwidth is a HTTP::Tiny subclass which manages bandwidth.
+HTTP::Tiny::Bandwidth is a HTTP::Tiny subclass which can limits download speed.
+If you want to use LWP with limitation of download speed,
+see [eg](https://github.com/shoichikaji/HTTP-Tiny-Bandwidth/tree/master/eg) directory.
 
 HTTP::Tiny::Bandwidth->mirror accepts `{ limit_bps => LIMIT_BIT_PER_SEC }` argument.
 

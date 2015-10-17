@@ -21,7 +21,6 @@ sub limit_data_callback {
         return 1 if $elapsed < $LIMIT_UNIT_SECOND;
         my $sleep = 8 * (tell($fh) - $previous->[1]) / $limit_bps - $elapsed;
         if ($sleep > 0) {
-            warn "-> sleep $sleep\n";
             select undef, undef, undef, $sleep;
             $previous->[0] = [Time::HiRes::gettimeofday];
             $previous->[1] = tell($fh);
@@ -68,7 +67,7 @@ __END__
 
 =head1 NAME
 
-HTTP::Tiny::Bandwidth - HTTP::Tiny with bandwidth management
+HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download speed
 
 =head1 SYNOPSIS
 
@@ -84,7 +83,9 @@ HTTP::Tiny::Bandwidth - HTTP::Tiny with bandwidth management
 
 =head1 DESCRIPTION
 
-HTTP::Tiny::Bandwidth is a HTTP::Tiny subclass which manages bandwidth.
+HTTP::Tiny::Bandwidth is a HTTP::Tiny subclass which can limits download speed.
+If you want to use LWP with limitation of download speed,
+see L<eg|https://github.com/shoichikaji/HTTP-Tiny-Bandwidth/tree/master/eg> directory.
 
 HTTP::Tiny::Bandwidth->mirror accepts C<< { limit_bps => LIMIT_BIT_PER_SEC } >> argument.
 
