@@ -7,8 +7,9 @@ our $VERSION = '0.01';
 use parent 'HTTP::Tiny';
 
 our $LIMIT_UNIT_SECOND = 0.001;
+sub BUFSIZE () { 32768 }
 
-sub limit_data_callback {
+sub download_limit_data_callback {
     shift;
     my ($fh, $limit_bps) = @_;
     if (!$limit_bps) {
@@ -27,6 +28,60 @@ sub limit_data_callback {
         }
     };
 }
+sub upload_limit_data_callback {
+    shift;
+    my ($fh, $limit_bps) = @_;
+    if (!$limit_bps) {
+        return sub {
+            my $len = read $fh, my $buf, BUFSIZE;
+            if (!defined $len) {
+                die "file read error: $!";
+            } elsif ($len == 0) {
+                undef; # EOF, finish
+            } else {
+                $buf;
+            }
+        };
+    }
+    my $previous = [ [Time::HiRes::gettimeofday], 0 ];
+    sub {
+        my $len = read $fh, my $buf, BUFSIZE;
+        if (!defined $len) {
+            die "file read error: $!";
+        } elsif ($len == 0) {
+            undef; # EOF, finish
+        } else {
+            $previous->[1] += $len;
+            my $elapsed = Time::HiRes::tv_interval($previous->[0]);
+            if ($elapsed > $LIMIT_UNIT_SECOND) {
+                my $sleep = 8 * $previous->[1] / $limit_bps - $elapsed;
+                if ($sleep > 0) {
+                    select undef, undef, undef, $sleep;
+                    $previous->[0] = [Time::HiRes::gettimeofday];
+                    $previous->[1] = 0;
+                }
+            }
+            $buf;
+        }
+    }
+}
+
+sub request {
+    my ($self, $method, $url, $args) = @_;
+    $args ||= +{};
+    if ($args->{content_file} || $args->{content_fh}) {
+        my $fh = delete $args->{content_fh};
+        unless ($fh) {
+            my $file = delete $args->{content_file};
+            open $fh, "<", $file or die "Cannot open $file: $!";
+            binmode $fh;
+        }
+        my $upload_limit_bps = delete $args->{upload_limit_bps};
+        $args->{content} = $self->upload_limit_data_callback($fh, $upload_limit_bps);
+        ($args->{headers} ||= +{})->{'Content-Length'} = -s $fh;
+    }
+    $self->SUPER::request($method, $url, $args);
+}
 
 # copy from HTTP::Tiny
 sub mirror {
@@ -42,7 +97,7 @@ sub mirror {
     sysopen my $fh, $tempfile, Fcntl::O_CREAT()|Fcntl::O_EXCL()|Fcntl::O_WRONLY()
     or Carp::croak(qq/Error: Could not create temporary file $tempfile for downloading: $!\n/);
     binmode $fh;
-    $args->{data_callback} = $self->limit_data_callback($fh, $args->{limit_bps});
+    $args->{data_callback} = $self->download_limit_data_callback($fh, $args->{download_limit_bps});
     my $response = $self->request('GET', $url, $args);
     close $fh
         or Carp::croak(qq/Error: Caught error closing temporary file $tempfile: $!\n/);
@@ -67,7 +122,7 @@ __END__
 
 =head1 NAME
 
-HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download speed
+HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download/upload speed
 
 =head1 SYNOPSIS
 
@@ -75,15 +130,25 @@ HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download speed
 
   my $http = HTTP::Tiny::Bandwidth->new;
 
+  # limit download speed
   my $res = $http->mirror(
     "http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz",
     "/path/to/save/perl-5.22.0.tar.gz",
-    { limit_bps => 5 * (1024**2), }, # limit 5Mbps
+    { download_limit_bps => 5 * (1024**2), },
+  );
+
+  # limit upload speed
+  my $res = $http->post(
+    "http://example.com",
+    {
+      content_file => "bigfile.bin", # or content_fh
+      upload_limit_bps => 5*(1024**2),
+    },
   );
 
 =head1 DESCRIPTION
 
-HTTP::Tiny::Bandwidth is a HTTP::Tiny subclass which can limits download speed.
+HTTP::Tiny::Bandwidth is a HTTP::Tiny subclass which can limits download/upload speed.
 
 If you want to use LWP::UserAgent with limitation of download speed,
 see L<eg|https://github.com/shoichikaji/HTTP-Tiny-Bandwidth/tree/master/eg> directory.
@@ -100,7 +165,7 @@ If you want to get content as perl variable, try this:
   my $http = HTTP::Tiny::Bandwidth->new;
   my $res = $http->get(
     "http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz",
-    { data_callback => $http->limit_data_callback($content_fh, $limit_bps) },
+    { data_callback => $http->download_limit_data_callback($content_fh, $limit_bps) },
   );
   close $content_fh;
   $res->{content} = $content;

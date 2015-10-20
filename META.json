@@ -1,5 +1,5 @@
 {
-   "abstract" : "HTTP::Tiny with limitation of download speed",
+   "abstract" : "HTTP::Tiny with limitation of download/upload speed",
    "author" : [
       "Shoichi Kaji"
    ],
