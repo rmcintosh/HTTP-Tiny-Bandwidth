@@ -9,19 +9,20 @@ HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download/upload speed
     use HTTP::Tiny::Bandwidth;
 
     my $http = HTTP::Tiny::Bandwidth->new;
+    my $limit_bps = 5 * (1024**2); # 5Mbps
 
     # limit download speed
     my $res = $http->mirror(
       "http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz",
       "/path/to/save/perl-5.22.0.tar.gz",
-      { download_limit_bps => 5 * (1024**2), },
+      { download_limit_bps => $limit_bps },
     );
 
     # limit upload speed
     my $res = $http->post(
       "http://example.com",
       {
-        content_file => "bigfile.bin", # or content_fh
+        content_file => "big-file.txt", # or content_fh
         upload_limit_bps => 5*(1024**2),
       },
     );
@@ -30,12 +31,16 @@ HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download/upload speed
 
 HTTP::Tiny::Bandwidth is a HTTP::Tiny subclass which can limits download/upload speed.
 
-If you want to use LWP::UserAgent with limitation of download speed,
+If you want to use LWP::UserAgent with limitation of download/upload speed,
 see [eg](https://github.com/shoichikaji/HTTP-Tiny-Bandwidth/tree/master/eg) directory.
 
-HTTP::Tiny::Bandwidth->mirror accepts `{ limit_bps => LIMIT_BIT_PER_SEC }` argument.
+HTTP::Tiny::Bandwidth->mirror accepts
 
-`mirror` method get content in a file.
+    { download_limit_bps => LIMIT_BIT_PER_SEC }
+
+argument.
+
+`mirror` method gets content in a file.
 If you want to get content as perl variable, try this:
 
     my $content;
@@ -45,7 +50,7 @@ If you want to get content as perl variable, try this:
     my $http = HTTP::Tiny::Bandwidth->new;
     my $res = $http->get(
       "http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz",
-      { data_callback => $http->download_limit_data_callback($content_fh, $limit_bps) },
+      { data_callback => $http->download_data_callback($content_fh, $limit_bps) },
     );
     close $content_fh;
     $res->{content} = $content;
