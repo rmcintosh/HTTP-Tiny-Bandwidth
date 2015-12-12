@@ -1,5 +1,6 @@
 requires 'perl', '5.008005';
 requires 'HTTP::Tiny';
+requires 'parent';
 
 on develop => sub {
     requires 'Plack';

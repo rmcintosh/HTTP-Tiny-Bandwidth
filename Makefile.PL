@@ -17,7 +17,8 @@ my %WriteMakefileArgs = (
   "MIN_PERL_VERSION" => "5.008005",
   "NAME" => "HTTP::Tiny::Bandwidth",
   "PREREQ_PM" => {
-    "HTTP::Tiny" => 0
+    "HTTP::Tiny" => 0,
+    "parent" => 0
   },
   "TEST_REQUIRES" => {
     "Test::More" => "0.98"
@@ -31,7 +32,8 @@ my %WriteMakefileArgs = (
 
 my %FallbackPrereqs = (
   "HTTP::Tiny" => 0,
-  "Test::More" => "0.98"
+  "Test::More" => "0.98",
+  "parent" => 0
 );
 
 
