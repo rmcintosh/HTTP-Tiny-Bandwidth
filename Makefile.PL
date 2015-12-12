@@ -20,7 +20,7 @@ my %WriteMakefileArgs = (
     "HTTP::Tiny" => 0
   },
   "TEST_REQUIRES" => {
-    "Test::More" => "0.96"
+    "Test::More" => "0.98"
   },
   "VERSION" => "0.01",
   "test" => {
@@ -31,7 +31,7 @@ my %WriteMakefileArgs = (
 
 my %FallbackPrereqs = (
   "HTTP::Tiny" => 0,
-  "Test::More" => "0.96"
+  "Test::More" => "0.98"
 );
 
 

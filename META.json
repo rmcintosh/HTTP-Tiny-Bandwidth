@@ -32,7 +32,9 @@
       "develop" : {
          "requires" : {
             "Dist::Milla" : "v1.0.15",
-            "Test::Pod" : "1.41"
+            "Plack" : "0",
+            "Test::Pod" : "1.41",
+            "Test::TCP" : "0"
          }
       },
       "runtime" : {
@@ -43,7 +45,7 @@
       },
       "test" : {
          "requires" : {
-            "Test::More" : "0.96"
+            "Test::More" : "0.98"
          }
       }
    },

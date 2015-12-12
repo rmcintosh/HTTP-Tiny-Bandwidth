@@ -2,25 +2,30 @@ package HTTP::Tiny::Bandwidth;
 use strict;
 use warnings;
 use Time::HiRes ();
+use Carp ();
 
 our $VERSION = '0.01';
 use parent 'HTTP::Tiny';
 
-our $LIMIT_UNIT_SECOND = 0.001;
-sub BUFSIZE () { 32768 }
+our $CHECK_INTERVAL_SECOND = 0.005;
 
-sub download_data_callback {
+use constant BUFSIZE => 32768;
+use constant DEBUG => $ENV{HTTP_TINY_BANDWIDTH_DEBUG};
+
+sub _download_data_callback {
     my ($self, $fh, $limit_bps) = @_;
     if (!$limit_bps) {
         return sub { print {$fh} $_[0] };
     }
-    my $previous = [ [Time::HiRes::gettimeofday], 0 ];
+    my $previous;
     sub {
         print {$fh} $_[0];
+        $previous ||= [ [Time::HiRes::gettimeofday], 0 ];
         my $elapsed = Time::HiRes::tv_interval($previous->[0]);
-        return 1 if $elapsed < $LIMIT_UNIT_SECOND;
+        return 1 if $elapsed < $CHECK_INTERVAL_SECOND;
         my $sleep = 8 * (tell($fh) - $previous->[1]) / $limit_bps - $elapsed;
         if ($sleep > 0) {
+            DEBUG and warn "-> (download) sleep $sleep\n";
             select undef, undef, undef, $sleep;
             $previous->[0] = [Time::HiRes::gettimeofday];
             $previous->[1] = tell($fh);
@@ -28,7 +33,7 @@ sub download_data_callback {
     };
 }
 
-sub upload_data_callback {
+sub _upload_data_callback {
     my ($self, $fh, $limit_bps) = @_;
     if (!$limit_bps) {
         return sub {
@@ -42,8 +47,10 @@ sub upload_data_callback {
             }
         };
     }
-    my $previous = [ [Time::HiRes::gettimeofday], 0 ];
+
+    my $previous;
     sub {
+        $previous ||= [ [Time::HiRes::gettimeofday], 0 ];
         my $len = read $fh, my $buf, BUFSIZE;
         if (!defined $len) {
             die "file read error: $!";
@@ -52,9 +59,10 @@ sub upload_data_callback {
         } else {
             $previous->[1] += $len;
             my $elapsed = Time::HiRes::tv_interval($previous->[0]);
-            if ($elapsed > $LIMIT_UNIT_SECOND) {
+            if ($elapsed > $CHECK_INTERVAL_SECOND) {
                 my $sleep = 8 * $previous->[1] / $limit_bps - $elapsed;
                 if ($sleep > 0) {
+                    DEBUG and warn "-> (upload) sleep $sleep\n";
                     select undef, undef, undef, $sleep;
                     $previous->[0] = [Time::HiRes::gettimeofday];
                     $previous->[1] = 0;
@@ -69,24 +77,46 @@ sub request {
     my ($self, $method, $url, $args) = @_;
     $args ||= +{};
     if ($args->{content_file} || $args->{content_fh}) {
-        my $fh = delete $args->{content_fh};
+        my $fh = $args->{content_fh};
         unless ($fh) {
-            my $file = delete $args->{content_file};
-            open $fh, "<", $file or die "Cannot open $file: $!";
+            my $file = $args->{content_file};
+            open $fh, "<", $file or Carp::croak("Error: Could not open $file: $!");
             binmode $fh;
         }
-        my $upload_limit_bps = delete $args->{upload_limit_bps};
-        $args->{content} = $self->upload_data_callback($fh, $upload_limit_bps);
-        ($args->{headers} ||= +{})->{'Content-Length'} = -s $fh;
+        my $upload_limit_bps = $args->{upload_limit_bps};
+        $args->{content} = $self->_upload_data_callback($fh, $upload_limit_bps);
+        ($args->{headers} ||= +{})->{'content-length'} = -s $fh;
+        # XXX set content-type via Plack::MIME?
     }
-    $self->SUPER::request($method, $url, $args);
+
+    my $set_bandwidth_data_callback;
+    my ($download_content, $download_content_fh);
+    if (my $download_limit_bps = $args->{download_limit_bps}) {
+        if ($args->{data_callback}) {
+            Carp::croak("Error: Can not specify both download_limit_bps "
+                . "and data_callback at the same time");
+        }
+        open $download_content_fh, ">", \$download_content;
+        $args->{data_callback}
+            = $self->_download_data_callback($download_content_fh, $download_limit_bps);
+        $set_bandwidth_data_callback++;
+    }
+
+    my $res = $self->SUPER::request($method, $url, $args);
+    if ($set_bandwidth_data_callback) {
+        close $download_content_fh;
+        if (length($res->{content} || '') == 0) {
+            $res->{content} = $download_content;
+        }
+    }
+    $res;
 }
 
 # copy from HTTP::Tiny
 sub mirror {
     my ($self, $url, $file, $args) = @_;
     @_ == 3 || (@_ == 4 && ref $args eq 'HASH')
-    or Carp::croak(q/Usage: $http->mirror(URL, FILE, [HASHREF])/ . "\n");
+        or Carp::croak(q/Usage: $http->mirror(URL, FILE, [HASHREF])/ . "\n");
     if ( -e $file and my $mtime = (stat($file))[9] ) {
         $args->{headers}{'if-modified-since'} ||= $self->_http_date($mtime);
     }
@@ -94,9 +124,10 @@ sub mirror {
 
     require Fcntl;
     sysopen my $fh, $tempfile, Fcntl::O_CREAT()|Fcntl::O_EXCL()|Fcntl::O_WRONLY()
-    or Carp::croak(qq/Error: Could not create temporary file $tempfile for downloading: $!\n/);
+        or Carp::croak(qq/Error: Could not create temporary file $tempfile for downloading: $!\n/);
     binmode $fh;
-    $args->{data_callback} = $self->download_data_callback($fh, $args->{download_limit_bps});
+    $args->{data_callback} = $self->_download_data_callback($fh, $args->{download_limit_bps});
+    local $args->{download_limit_bps}; # so that request method does not set bandwith data callback
     my $response = $self->request('GET', $url, $args);
     close $fh
         or Carp::croak(qq/Error: Caught error closing temporary file $tempfile: $!\n/);
@@ -128,53 +159,77 @@ HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download/upload speed
   use HTTP::Tiny::Bandwidth;
 
   my $http = HTTP::Tiny::Bandwidth->new;
-  my $limit_bps = 5 * (1024**2); # 5Mbps
 
   # limit download speed
+  my $res = $http->get("http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz", {
+    download_limit_bps => 5 * (1024**2), # limit 5Mbps
+  });
+
+  # you can save memory with mirror method
   my $res = $http->mirror(
     "http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz",
     "/path/to/save/perl-5.22.0.tar.gz",
-    { download_limit_bps => $limit_bps },
+    { download_limit_bps => 5 * (1024**2) }, # limit 5Mbps
   );
 
   # limit upload speed
-  my $res = $http->post(
-    "http://example.com",
-    {
-      content_file => "big-file.txt", # or content_fh
-      upload_limit_bps => 5*(1024**2),
-    },
-  );
+  my $res = $http->post("http://example.com", {
+      content_file     => "big-file.txt", # or content_fh
+      upload_limit_bps => 5 * (1024**2),  # limit 5Mbps
+  });
 
 =head1 DESCRIPTION
 
-HTTP::Tiny::Bandwidth is a HTTP::Tiny subclass which can limits download/upload speed.
+HTTP::Tiny::Bandwidth is a subclass of L<HTTP::Tiny> which can limit download/upload speed.
 
 If you want to use LWP::UserAgent with limitation of download/upload speed,
 see L<eg|https://github.com/shoichikaji/HTTP-Tiny-Bandwidth/tree/master/eg> directory.
 
-HTTP::Tiny::Bandwidth->mirror accepts
+=head2 HOW TO LIMIT DOWNLOAD SPEED
 
-  { download_limit_bps => LIMIT_BIT_PER_SEC }
+HTTP::Tiny::Bandwidth's C<request/get/...> and C<mirror> methods accepts
+C<download_limit_bps> option:
 
-argument.
-
-C<mirror> method gets content in a file.
-If you want to get content as perl variable, try this:
-
-  my $content;
-  open my $content_fh, "+>", \$content;
-
-  my $limit_bps = 5 * (1024**2); # 5Mbps
   my $http = HTTP::Tiny::Bandwidth->new;
-  my $res = $http->get(
-    "http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz",
-    { data_callback => $http->download_data_callback($content_fh, $limit_bps) },
-  );
-  close $content_fh;
-  $res->{content} = $content;
 
-  # do something with $res
+  my $res = $http->get("http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz", {
+    download_limit_bps => 5 * (1024**2),
+  });
+
+  my $res = $http->mirror(
+    "http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz",
+    "/path/to/save/perl-5.22.0.tar.gz",
+    { download_limit_bps => 5 * (1024**2) },
+  );
+
+=head2 HOW TO LIMIT UPLOAD SPEED
+
+HTTP::Tiny::Bandwidth's C<request/post/put/...> methods accepts
+C<content_file>, C<content_fh>, C<upload_limit_bps> options:
+
+  my $http = HTTP::Tiny::Bandwidth->new;
+
+  # content_file
+  my $res = $http->post("http://example.com", {
+    content_file => "big-file.txt",
+    upload_limit_bps => 5 * (1024**2), # limit 5Mbps
+  });
+
+  # or, you can specify content_fh
+  open my $fh, "<", "big-file.txt" or die;
+  my $res = $http->post("http://example.com", {
+    content_fh => $fh,
+    upload_limit_bps => 5 * (1024**2), # limit 5Mbps
+  });
+
+  # you can even omit upload_limit_bps which means no limitation of upload speed :)
+  my $res = $http->post("http://example.com", {
+    content_file => "big-file.txt",
+  });
+
+=head1 SEE ALSO
+
+L<HTTP::Tiny>
 
 =head1 COPYRIGHT AND LICENSE
 

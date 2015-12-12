@@ -3,6 +3,6 @@ use warnings;
 use Test::More;
 use HTTP::Tiny::Bandwidth;
 
-pass "ok";
+pass "Actual tests are in xt/ directory :)";
 
 done_testing;
