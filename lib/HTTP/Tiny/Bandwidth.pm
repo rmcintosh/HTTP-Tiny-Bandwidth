@@ -174,8 +174,8 @@ HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download/upload speed
 
   # limit upload speed
   my $res = $http->post("http://example.com", {
-      content_file     => "big-file.txt", # or content_fh
-      upload_limit_bps => 5 * (1024**2),  # limit 5Mbps
+    content_file     => "big-file.txt", # or content_fh
+    upload_limit_bps => 5 * (1024**2),  # limit 5Mbps
   });
 
 =head1 DESCRIPTION
@@ -211,20 +211,15 @@ C<content_file>, C<content_fh>, C<upload_limit_bps> options:
 
   # content_file
   my $res = $http->post("http://example.com", {
-    content_file => "big-file.txt",
+    content_file     => "big-file.txt",
     upload_limit_bps => 5 * (1024**2), # limit 5Mbps
   });
 
   # or, you can specify content_fh
   open my $fh, "<", "big-file.txt" or die;
   my $res = $http->post("http://example.com", {
-    content_fh => $fh,
+    content_fh       => $fh,
     upload_limit_bps => 5 * (1024**2), # limit 5Mbps
-  });
-
-  # you can even omit upload_limit_bps which means no limitation of upload speed :)
-  my $res = $http->post("http://example.com", {
-    content_file => "big-file.txt",
   });
 
 =head1 SEE ALSO
