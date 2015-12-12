@@ -15,7 +15,7 @@ HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download/upload speed
       download_limit_bps => 5 * (1024**2), # limit 5Mbps
     });
 
-    # you can save memory with mirror method.
+    # you can save memory with mirror method
     my $res = $http->mirror(
       "http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz",
       "/path/to/save/perl-5.22.0.tar.gz",
@@ -30,7 +30,7 @@ HTTP::Tiny::Bandwidth - HTTP::Tiny with limitation of download/upload speed
 
 # DESCRIPTION
 
-HTTP::Tiny::Bandwidth is a subclass of HTTP::Tiny which can limits download/upload speed.
+HTTP::Tiny::Bandwidth is a subclass of [HTTP::Tiny](https://metacpan.org/pod/HTTP::Tiny) which can limit download/upload speed.
 
 If you want to use LWP::UserAgent with limitation of download/upload speed,
 see [eg](https://github.com/shoichikaji/HTTP-Tiny-Bandwidth/tree/master/eg) directory.
@@ -49,7 +49,7 @@ HTTP::Tiny::Bandwidth's `request/get/...` and `mirror` methods accepts
     my $res = $http->mirror(
       "http://www.cpan.org/src/5.0/perl-5.22.0.tar.gz",
       "/path/to/save/perl-5.22.0.tar.gz",
-      { download_limit_bps => 5 * (1024**2) }, # limit 5Mbps
+      { download_limit_bps => 5 * (1024**2) },
     );
 
 ## HOW TO LIMIT UPLOAD SPEED
@@ -72,10 +72,14 @@ HTTP::Tiny::Bandwidth's `request/post/put/...` methods accepts
       upload_limit_bps => 5 * (1024**2), # limit 5Mbps
     });
 
-    # you can even omit upload_limit_bps which means no limitation of uploading speed :)
+    # you can even omit upload_limit_bps which means no limitation of upload speed :)
     my $res = $http->post("http://example.com", {
       content_file => "big-file.txt",
     });
+
+# SEE ALSO
+
+[HTTP::Tiny](https://metacpan.org/pod/HTTP::Tiny)
 
 # COPYRIGHT AND LICENSE
 

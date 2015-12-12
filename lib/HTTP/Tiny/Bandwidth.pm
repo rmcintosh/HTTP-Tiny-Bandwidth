@@ -7,7 +7,7 @@ use Carp ();
 our $VERSION = '0.01';
 use parent 'HTTP::Tiny';
 
-our $CHECK_INTERVAL_SECOND = 0.005;
+our $CHECK_INTERVAL_SECOND = 0.001;
 
 use constant BUFSIZE => 32768;
 use constant DEBUG => $ENV{HTTP_TINY_BANDWIDTH_DEBUG};

@@ -47,7 +47,9 @@ subtest post => sub {
     is length($res->{content}), 25 * (1024**2);
 
     my $actual_bps = 8 * (25*2) * (1024**2) / $elapsed;
-    ok abs( $actual_bps - $bps ) < 2 * (1024**2);
+    note sprintf "-> elapsed: %.2fsec, actual_bps: %.1fMbps, expect_bps: %.1fMbps",
+        $elapsed, $actual_bps / (1024**2), $bps / (1024**2);
+    ok abs( $actual_bps - $bps ) < 4 * (1024**2);
 };
 
 done_testing;
